@@ -1,0 +1,154 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  
+  .app-container {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    padding: 20px;
+  }
+  
+  .login-box {
+    background: white;
+    border-radius: 10px;
+    padding: 40px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+  }
+  
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 30px;
+  }
+  
+  .logo {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .logo svg {
+    width: 100%;
+    height: 100%;
+  }
+  
+  h1 {
+    color: #333;
+    font-size: 24px;
+    margin: 0;
+  }
+  
+  .input-group {
+    margin-bottom: 20px;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 8px;
+    color: #555;
+    font-size: 14px;
+  }
+  
+  input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+  }
+  
+  input:focus {
+    outline: none;
+    border-color: #4a90e2;
+  }
+  
+  .button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+    margin-bottom: 20px;
+  }
+  
+  button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  
+  button:hover {
+    transform: translateY(-2px);
+  }
+  
+  .btn-login {
+    background-color: #4a90e2;
+    color: white;
+  }
+  
+  .btn-login:hover {
+    background-color: #357abd;
+  }
+  
+  .btn-reset {
+    background-color: #f0f0f0;
+    color: #333;
+  }
+  
+  .btn-reset:hover {
+    background-color: #e0e0e0;
+  }
+  
+  .btn-register {
+    background-color: #5cb85c;
+    color: white;
+  }
+  
+  .btn-register:hover {
+    background-color: #4cae4c;
+  }
+  
+  .message {
+    padding: 12px;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 14px;
+    animation: fadeIn 0.3s ease;
+  }
+  
+  .success {
+    background-color: #dff0d8;
+    color: #3c763d;
+    border: 1px solid #d6e9c6;
+  }
+  
+  .error {
+    background-color: #f2dede;
+    color: #a94442;
+    border: 1px solid #ebccd1;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
