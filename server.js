@@ -1,81 +1,151 @@
-// Imports des modules Node.js essentiels 
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const validator = require('validator');
+
 const app = express();
 
-// Middleware de base
-app.use(cors());  // Permet les requêtes depuis d'autres domaines
-app.use(express.json());  // Pour traiter les données JSON
-app.use(express.static('build'));
+// Protection basique avec helmet
+app.use(helmet());
 
-// Stockage des données utilisateurs dans un CSV
+// Limiteur de taux de requêtes
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limite chaque IP à 100 requêtes par fenêtre
+});
+app.use(limiter);
+
+// Options CORS restrictives
+const corsOptions = {
+  origin: 'http://localhost:3000',
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
+app.use(express.json({ limit: '10kb' })); // Limite la taille des requêtes
+app.use(express.static('build', {
+  maxAge: '1h',
+  setHeaders: (res, path) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+  }
+}));
+
 const CSV_FILE = path.join(__dirname, 'users.csv');
 
-// Création du fichier CSV si nécessaire
-if (!fs.existsSync(CSV_FILE)) {
-  fs.writeFileSync(CSV_FILE, 'username,password\n');
+// Validation des entrées
+function validateInput(input) {
+  return validator.isAlphanumeric(input) && 
+         validator.isLength(input, { min: 4, max: 30 }) &&
+         !validator.contains(input, ','); // Prévention injection CSV
 }
 
-// Fonction pour lire les utilisateurs du CSV
-// Important: Cette fonction synchrone bloque le thread principal
+// Lecture sécurisée du CSV
 function readUsers() {
-  const content = fs.readFileSync(CSV_FILE, 'utf-8');
-  return content.split('\n')
-    .slice(1)  // Ignore l'en-tête du CSV
-    .filter(line => line.trim())
-    .map(line => {
-      const [username, password] = line.split(',');
-      return { username, password };
-    });
+  try {
+    const content = fs.readFileSync(CSV_FILE, 'utf-8');
+    return content.split('\n')
+      .slice(1)
+      .filter(line => line.trim())
+      .map(line => {
+        const [username, password] = line.split(',').map(field => field.trim());
+        return { username, password };
+      });
+  } catch (error) {
+    console.error('Erreur de lecture:', error);
+    return [];
+  }
 }
 
-// Fonction pour sauvegarder les utilisateurs
-// À améliorer: Utiliser une base de données pour la production
+// Écriture sécurisée dans le CSV
 function writeUsers(users) {
-  const content = 'username,password\n' +
-    users.map(user => `${user.username},${user.password}`).join('\n');
-  fs.writeFileSync(CSV_FILE, content);
+  try {
+    const content = 'username,password\n' + 
+      users.map(user => `${validator.escape(user.username)},${user.password}`).join('\n');
+    fs.writeFileSync(CSV_FILE, content, { encoding: 'utf-8', flag: 'w' });
+  } catch (error) {
+    console.error('Erreur d\'écriture:', error);
+    throw new Error('Erreur lors de l\'enregistrement');
+  }
 }
 
-// Route de login - POST /login
-// Vérifie les credentials de l'utilisateur
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  const users = readUsers();
-  
-  // Recherche l'utilisateur et vérifie le mot de passe
-  const user = users.find(u => u.username === username);
-  if (!user || !bcrypt.compareSync(password, user.password)) {
-    return res.status(401).json({ message: 'Identifiant ou mot de passe incorrect' });
+app.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // Validation des entrées
+    if (!username || !password || !validateInput(username)) {
+      return res.status(400).json({ message: 'Données invalides' });
+    }
+
+    const users = readUsers();
+    const user = users.find(u => u.username === validator.escape(username));
+    
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ 
+        message: 'Identifiant ou mot de passe incorrect',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ 
+      message: 'Connexion réussie',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Erreur login:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
-  
-  res.json({ message: 'Connexion réussie' });
 });
 
-// Route d'inscription - POST /register
-// Crée un nouvel utilisateur si le username est disponible
-app.post('/register', (req, res) => {
-  const { username, password } = req.body;
-  const users = readUsers();
+app.post('/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
 
-  // Vérifie si l'utilisateur existe déjà
-  if (users.some(u => u.username === username)) {
-    return res.status(400).json({ message: 'Cet identifiant existe déjà' });
+    // Validation renforcée
+    if (!username || !password || !validateInput(username)) {
+      return res.status(400).json({ message: 'Données invalides' });
+    }
+
+    // Validation du mot de passe
+    if (password.length < 8 || !(/[A-Z]/.test(password) && /[0-9]/.test(password))) {
+      return res.status(400).json({ 
+        message: 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre' 
+      });
+    }
+
+    const users = readUsers();
+    
+    if (users.some(u => u.username === username)) {
+      return res.status(400).json({ message: 'Cet identifiant existe déjà' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12); // Augmentation du coût
+    users.push({ 
+      username: validator.escape(username), 
+      password: hashedPassword 
+    });
+    
+    writeUsers(users);
+    
+    res.json({ message: 'Compte créé avec succès' });
+  } catch (error) {
+    console.error('Erreur register:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
-
-  // Hash le mot de passe avant de le stocker
-  const hashedPassword = bcrypt.hashSync(password, 10);
-  users.push({ username, password: hashedPassword });
-  writeUsers(users);
-  
-  res.json({ message: 'Compte créé avec succès' });
 });
 
-// Démarrage du serveur
-const PORT = 3000;
+// Gestion des erreurs globale
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Erreur serveur inattendue' });
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
+  // Ne pas exposer les détails de version en production
   console.log(`Serveur démarré sur http://localhost:${PORT}`);
 });

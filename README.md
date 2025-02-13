@@ -122,3 +122,82 @@ secure-login/
 - Le stockage CSV est utilisé à des fins pédagogiques, une base de données sécurisée serait préférable en production
 - Les tokens de session et la gestion des cookies ne sont pas implémentés dans cette version basique
 
+## Améliorations de Sécurité Effectuées
+
+### Protection contre les Injections (OWASP A1)
+
+1. **Validation stricte des entrées**
+   - Implémentation d'une fonction `validateInput` pour vérifier :
+     ```javascript
+     function validateInput(input) {
+       return validator.isAlphanumeric(input) && 
+              validator.isLength(input, { min: 4, max: 30 }) &&
+              !validator.contains(input, ',');
+     }
+     ```
+   - Validation des caractères alphanumériques uniquement
+   - Limitation de la longueur des entrées
+   - Protection contre l'injection CSV
+
+2. **Sanitization des données**
+   - Échappement automatique des caractères spéciaux
+   - Nettoyage des données avant stockage dans le CSV
+   - Validation du format des données
+
+3. **Protection du stockage**
+   - Format CSV sécurisé avec échappement des délimiteurs
+   - Validation avant écriture
+   - Gestion sécurisée des erreurs de lecture/écriture
+
+### Protection des Données Sensibles (OWASP A3)
+
+1. **Sécurisation des mots de passe**
+   - Utilisation de bcrypt avec un coût élevé (12 rounds)
+   - Validation renforcée des mots de passe :
+     - Minimum 8 caractères
+     - Au moins une majuscule
+     - Au moins un chiffre
+
+2. **Contrôle d'accès**
+   - Implementation du rate limiting :
+     ```javascript
+     const limiter = rateLimit({
+       windowMs: 15 * 60 * 1000, // 15 minutes
+       max: 100 // limite par IP
+     });
+     ```
+   - Protection contre les attaques par force brute
+   - Limitation du nombre de requêtes
+
+3. **Sécurité des communications**
+   - Configuration CORS restrictive
+   - Headers sécurisés via Helmet
+   - Limitation de la taille des requêtes (10kb max)
+
+4. **Protection des informations**
+   - Messages d'erreur génériques
+   - Pas d'exposition des détails techniques
+   - Timestamps standardisés
+   - Logs sécurisés
+
+## Installation et Dépendances
+
+Pour implémenter ces améliorations de sécurité, installez les dépendances nécessaires :
+
+```bash
+npm install bcryptjs helmet express-rate-limit validator cors express
+```
+
+Les packages installés sont :
+- `bcryptjs` : Pour le hashage sécurisé des mots de passe
+- `helmet` : Pour la sécurisation des headers HTTP
+- `express-rate-limit` : Pour la limitation des requêtes
+- `validator` : Pour la validation et l'assainissement des entrées
+- `cors` : Pour la gestion sécurisée des requêtes cross-origin
+- `express` : Framework web pour Node.js
+
+Une fois les dépendances installées, redémarrez votre serveur pour appliquer les nouvelles mesures de sécurité :
+```bash
+npm run build
+npm start
+```
